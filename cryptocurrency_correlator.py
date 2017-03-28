@@ -37,8 +37,6 @@ def read_crypto_file():
     
 
 
-
-
 ## Pulls data from Poloniex API between the start and end dates.
 ## "Start" and "end" are given in UNIX timestamp format and used 
 ## to specify the date range for the data returned.
@@ -51,7 +49,7 @@ def get_data_from_polo():
 
     tickers = read_crypto_file()
  
-
+## Start and end dates
     start_date = date(2017,1,1)
     timestamp1 = calendar.timegm(start_date.timetuple())
     start = timestamp1
@@ -65,14 +63,31 @@ def get_data_from_polo():
  
 ## Candlestick period valid values are 300, 900, 1800, 7200, 14400, and 86400
     period = 86400
-        
 
+## Currency Pairing
+    pairing = 'BTC_'
+
+
+## Creating a Bitcoin/USD datafram for converting coins to USD 
+    coin_lookup('BTC',start,end,period,'USDT_')
+    df_btc = pd.read_csv('coin_dfs/BTC.csv')
+    df_btc.set_index('date', inplace=True)
+
+    df_btc.rename(columns = {'close':'BTC'}, inplace=True)
+    df_btc.drop(['high','low','open','quoteVolume','weightedAverage','volume'], 1, inplace=True)
+    df_btc.to_pickle('df_btc.pickle')
+
+
+## Coin.txt lookup
     for ticker in tickers:
+        coin_lookup(ticker,start,end,period,pairing)
+
+def coin_lookup(ticker,start,end,period, pairing):
  
 ## Creates a seperate CSV file for each coin.
         if not os.path.exists('coin_dfs/{}.csv'.format(ticker)):
             print(ticker)
-            df = urllib.request.urlopen('https://poloniex.com/public?command=' + "returnChartData" + '&currencyPair=' + 'BTC_'+ str(ticker) + '&start=' + str(start) + '&end=' + str(end) +'&period=' + str(period)) 
+            df = urllib.request.urlopen('https://poloniex.com/public?command=' + "returnChartData" + '&currencyPair=' + str(pairing) + str(ticker) + '&start=' + str(start) + '&end=' + str(end) +'&period=' + str(period))
             str_info = df.read().decode('utf-8')
             info = json.loads(str_info)
             with open('coin_dfs/{}.csv'.format(ticker),'w',encoding='utf8') as f:
@@ -95,6 +110,10 @@ def compile_data():
     
     main_df = pd.DataFrame()
 
+# Read the BTC price data and set it to head of the dataframe
+    df_btc = pd.read_pickle('df_btc.pickle')
+    main_df = df_btc
+
     for count,ticker in enumerate(tickers):
         df = pd.read_csv('coin_dfs/{}.csv'.format(ticker))
         df.set_index('date', inplace=True)
@@ -102,22 +121,29 @@ def compile_data():
         df.rename(columns = {'close':ticker}, inplace=True)
         df.drop(['high','low','open','quoteVolume','weightedAverage','volume'], 1, inplace=True)
         
+# Converts price values from /BTC to /USD
+        df_usd = df.join(df_btc)
+        df_usd['{}'.format(ticker)] = df_usd['{}'.format(ticker)] * df_usd['BTC']        
+        df_usd.drop(['BTC'],1, inplace = True)
+
+
         if main_df.empty:
-            main_df = df    
+            main_df = df_usd    
         else:
-            main_df = main_df.join(df,how='outer')
+            main_df = main_df.join(df_usd,how='outer')
 
 ## Show Progress
         if count % 10 == 0:
             print(count)
 
-    print(main_df.head())
+    print(main_df.tail())
     main_df.to_csv('coin_joined_closes.csv')
+
 
 def visualize_data():
     compile_data()
     df = pd.read_csv('coin_joined_closes.csv')
-    df.drop(['date'], 1, inplace=True)
+    df.drop(['date'], 1, inplace= True)
     
     df_corr = df.corr()
     
@@ -126,7 +152,7 @@ def visualize_data():
     data = df_corr.values
     fig = plt.figure()
 
-## Chart layout options
+## chart layout options
     ax = fig.add_subplot(1,1,1)
     
     heatmap = ax.pcolor(data, cmap=plt.cm.RdYlGn)
