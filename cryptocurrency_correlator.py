@@ -17,8 +17,6 @@ import requests
 import sys
 
 
-
-
 #Poloniex API#
 import urllib
 import urllib.request
@@ -29,41 +27,36 @@ import hmac,hashlib
 
 style.use('ggplot')
 
+
+
+## Start and end dates
+start_date = date(2017,1,1)
+end_date = date(2017,3,30)
+
+## Candlestick period valid values are 300, 900, 1800, 7200, 14400, and 86400
+period = 86400
+
+
+
 ## Pulls coin names from a space seperated text file
 def read_crypto_file():
     file = open('coins.txt','r')
     coins = file.read().splitlines()
     return coins
-    
-
-
-## Pulls data from Poloniex API between the start and end dates.
-## "Start" and "end" are given in UNIX timestamp format and used 
-## to specify the date range for the data returned.
-## Candlestick period in seconds; valid values are 
-## 300 (5 minutes), 900 (15 minutes), 1800 (30 minutes), 
-## 7200 (2 hours), 14400 (4 hours), and 86400 (1 day)
 
 def get_data_from_polo():
     
-
     tickers = read_crypto_file()
  
-## Start and end dates
-    start_date = date(2017,1,1)
     timestamp1 = calendar.timegm(start_date.timetuple())
     start = timestamp1
-
-    end_date = date(2017,3,27)
+    
     timestamp2 = calendar.timegm(end_date.timetuple())
     end = timestamp2
     
     if not os.path.exists('coin_dfs'):
         os.makedirs('coin_dfs')
  
-## Candlestick period valid values are 300, 900, 1800, 7200, 14400, and 86400
-    period = 86400
-
 ## Currency Pairing
     pairing = 'BTC_'
 
@@ -130,6 +123,7 @@ def compile_data():
         if main_df.empty:
             main_df = df_usd    
         else:
+
             main_df = main_df.join(df_usd,how='outer')
 
 ## Show Progress
@@ -152,7 +146,7 @@ def visualize_data():
     data = df_corr.values
     fig = plt.figure()
 
-## chart layout options
+## Chart layout options
     ax = fig.add_subplot(1,1,1)
     
     heatmap = ax.pcolor(data, cmap=plt.cm.RdYlGn)
@@ -164,6 +158,9 @@ def visualize_data():
     
     column_labels = df_corr.columns
     row_labels = df_corr.index
+
+## 
+##  plt.title('{} - {} ({} min) /n'.format(start_date, end_date, (period/60)))
 
     ax.set_xticklabels(column_labels)
     ax.set_yticklabels(row_labels)
